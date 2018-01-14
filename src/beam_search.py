@@ -67,6 +67,11 @@ class Decoder(object):
         return beam[0].sent
 
     def rewrite(self, batch):
+        """
+        Rewrites a batch to the generator initial hidden states for the original and transferred domains
+        :param batch: input batch
+        :return: initial hidden states for the original and transferred domains
+        """
         model = self.model
         h_ori, h_tsf= self.sess.run([model.h_ori, model.h_tsf],
             feed_dict={model.dropout: 1,
