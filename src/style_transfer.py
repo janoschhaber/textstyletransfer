@@ -5,7 +5,7 @@ import random
 
 from vocab import Vocabulary, build_vocab
 from losses import Losses
-from options import load_arguments
+from options import load_arguments, load_arguments_live
 from file_io import load_sent, write_sent
 from utils import *
 from nn import *
@@ -364,6 +364,7 @@ def main(unused_argv):
         test_losses.output('test')
 
     elif args.online_testing:
+        print(sys.argv[0])
         vocab = Vocabulary(args.vocab)
         tf.logging.info('vocabulary size: %d', vocab.size)
         model = Model(args, vocab, logdir)
@@ -386,6 +387,43 @@ def main(unused_argv):
             print('original:', ' '.join(w for w in ori[0]))
             print('transfer:', ' '.join(w for w in tsf[0]))
 
+
+def load_online():
+    args = load_arguments_live()
+    logdir = "../logs"
+    # data_path = '/media/janosch/DATA/Documents/Mostafa/textstyletransfer/textstyletransfer/data/yelp/sentiment.test'
+    # vocab_path = '/media/janosch/DATA/Documents/Mostafa/textstyletransfer/textstyletransfer/tmp/yelp.vocab'
+    # model_path = '/media/janosch/DATA/Documents/Mostafa/textstyletransfer/textstyletransfer/tmp/model'
+    # logdir = '/media/janosch/DATA/Documents/Mostafa/textstyletransfer/textstyletransfer/tmp/logs'
+    # load_model = True
+
+    # vocab = Vocabulary(vocab_path)
+    # tf.logging.info('vocabulary size: %d', vocab.size)
+    # model = Model(args, vocab, logdir)
+    # sess = tf.Session(config=get_config())
+    # tf.logging.info('Loading model from', model_path)
+    # model.saver.restore(sess, model.path)
+    # decoder = Decoder(sess, args, vocab, model)
+
+    vocab = Vocabulary(args.vocab)
+    tf.logging.info('vocabulary size: %d', vocab.size)
+    model = Model(args, vocab, logdir)
+    sess = tf.Session(config=get_config())
+    tf.logging.info('Loading model from', args.model)
+    model.saver.restore(sess, args.model)
+    decoder = Decoder(sess, args, vocab, model)
+    return vocab, decoder
+
+    
+def flask_interface(inp, vocab, decoder):
+    inp = inp.split()
+    y = int(inp[0])
+    sent = inp[1:]
+
+    batch = get_batch([sent], [y], vocab.word2id)
+    ori, tsf = decoder.rewrite(batch)
+
+    return (' '.join(w for w in ori[0]), ' '.join(w for w in tsf[0]))
 
 
 if __name__ == '__main__':
