@@ -3,6 +3,7 @@ import argparse
 import pprint
 import tensorflow as tf
 
+
 def load_arguments():
     argparser = argparse.ArgumentParser(sys.argv[0])
 
@@ -18,6 +19,11 @@ def load_arguments():
     argparser.add_argument('--online_testing',
             type=bool,
             default=False)
+    argparser.add_argument('--experiment',
+            action='store_true')
+    argparser.add_argument('--experiment_data',
+                           type=str,
+                           default='')
     argparser.add_argument('--output',
             type=str,
             default='')

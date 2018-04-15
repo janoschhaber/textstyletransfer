@@ -111,7 +111,7 @@ def softmax_word(dropout, proj_W, proj_b, embedding, gamma):
     :param proj_W: projection matrix W
     :param proj_b: projection bias b
     :param embedding: [vocab size x dim_emb] embedding matrix
-    :param gamma: TODO
+    :param gamma: temperature. The higher, the more skewed the distribution becomes
     :return: the softmax function for a given output.
     """
     def loop_func(output):
@@ -165,7 +165,7 @@ def rnn_decode(h, inp, length, cell, loop_func, scope):
             inp, logits = loop_func(output)
             logits_seq.append(tf.expand_dims(logits, 1))
 
-    # TODO: Output dims?
+    # the lists get converted into a single tensor with each time step concatenated on the columns
     return tf.concat(axis=1, values=h_seq), tf.concat(axis=1, values=logits_seq)
 
 

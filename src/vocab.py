@@ -4,6 +4,7 @@ import pickle
 from collections import Counter
 import csv
 
+
 class Vocabulary(object):
   def __init__(self, vocab_file, emb_file='', dim_emb=0):
     with open(vocab_file, 'rb') as f:
@@ -24,9 +25,10 @@ class Vocabulary(object):
     for i in range(self.size):
         self.embedding[i] /= LA.norm(self.embedding[i])
 
+
 def build_vocab(data, vocab_path, vocab_metadata_path, min_occur=5):
 
-    word2id = {'<pad>':0, '<go>':1, '<eos>':2, '<unk>':3}
+    word2id = {'<pad>': 0, '<go>': 1, '<eos>': 2, '<unk>': 3}
     id2word = ['<pad>', '<go>', '<eos>', '<unk>']
 
     words = [word for sent in data for word in sent]
