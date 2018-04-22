@@ -13,6 +13,8 @@ from greedy_decoding import Decoder
 from utils import get_config
 import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
+import pickle
+from os.path import isfile
 
 
 class Model(object):
@@ -140,9 +142,9 @@ class Model(object):
             # fab code
             # soft_h_tsf is [batch, num_words, embedding_size]. That is, it has a latent representation for each word.
             # I'll take only the last one, since that includes information from every word
-            self.h_tsf = soft_h_tsf[:, -1, :]
+            self.mean_h_tsf = soft_h_tsf[:, -1, :]
             # now I'll just take the average of the batch
-            self.h_tsf = tf.reduce_mean(self.h_tsf, axis=0)
+            self.mean_h_tsf = tf.reduce_mean(self.h_tsf, axis=0)
 
         #####   discriminator   #####
         with tf.name_scope("discriminators"):
@@ -403,7 +405,7 @@ def main(unused_argv):
             if inp == 'quit' or inp == 'exit':
                 break
             inp = inp.split()
-            y = int(inp[0])  # this will be used as style. It is a very poorly definition of style: labels is used on
+            y = int(inp[0])  # this will be used as style. It is a very poor definition of style: labels is used on
             # generators to multiply with a matrix and get dim_y (e.g. 200) embedding.
             # with this label, it's a very silly operation where 1 gets W + b and 0 produces just b. So style is just
             # the initial state of the generator, which is an embedding equalling always W + b for style 1, and just
@@ -415,6 +417,7 @@ def main(unused_argv):
             print('original:', ' '.join(w for w in ori[0]))
             print('transfer:', ' '.join(w for w in tsf[0]))
     elif args.experiment:
+        import beam_search
         vocab = Vocabulary(args.vocab)
         tf.logging.info('vocabulary size: %d', vocab.size)
         model = Model(args, vocab, logdir)
@@ -425,23 +428,47 @@ def main(unused_argv):
 
         samples0 = load_sent(args.experiment_data + '.0')
         batches0, _ = get_batches_single_domain(samples0, vocab.word2id, args.batch_size, 0)
-        h_tsf0 = []
-        for batch in batches0:
-            h_tsf0.append(sess.run(model.h_tsf, feed_dict=feed_dict_experiment(model, batch, args)))
-        mean_x0 = np.mean(h_tsf0, axis=0)
 
         samples1 = load_sent(args.experiment_data + '.1')
         batches1, _ = get_batches_single_domain(samples1, vocab.word2id, args.batch_size, 1)
-        h_tsf1 = []
-        for batch in batches1:
-            h_tsf1.append(sess.run(model.h_tsf, feed_dict=feed_dict_experiment(model, batch, args)))
-        mean_x1 = np.mean(h_tsf1, axis=0)
+        if args.styler_restore:
+            if not isfile(args.styler_restore):
+                print('couldn\'t find styler vector file: {}'.format(args.styler_restore))
+                return 0
+            with open(args.styler_restore, 'rb') as restore_fh:
+                mean_x0, mean_x1 = pickle.load(restore_fh)
+                print('successfully restored styler vectors')
+        else:
+            h_tsf0 = []
+            for batch in batches0:
+                h_tsf0.append(sess.run(model.mean_h_tsf, feed_dict=feed_dict_experiment(model, batch, args)))
+            mean_x0 = np.mean(h_tsf0, axis=0)
+
+            h_tsf1 = []
+            for batch in batches1:
+                h_tsf1.append(sess.run(model.mean_h_tsf, feed_dict=feed_dict_experiment(model, batch, args)))
+            mean_x1 = np.mean(h_tsf1, axis=0)
+            if args.styler_save:
+                with open(args.styler_save, 'wb') as save_fh:
+                    pickle.dump((mean_x0, mean_x1), save_fh)
 
         # thus far we have the average latent representation for both domains. Now the hypothesis is that
         # mean_x0 - mean_x1 is a vector that removes the domain1 style and adds the domain 2 style instead
         # We will try it with several domain 1 sentences, we will take their encoded representation, add this vector
         # and then decode into THE SAME DOMAIN (i.e. 1) to see if decoding like this, produces domain 0-like sentences
         # we can then compared the transference using this method vs the original method
+        print('got the styler vectors, now using them')
+        style0_converter = mean_x0 - mean_x1
+        decoder = beam_search.Decoder(sess, args, vocab, model)
+        with open(args.styler_results, 'w') as styler_output_fh:
+            styler_output_fh.write('original\t|||\ttransferred\t|||\texperimental transfer\n')
+            for batch in batches1:
+                ori, tsf, tsf_experiment = decoder.rewrite_experiment(batch, style0_converter)
+                for ori_sent, tsf_sent, tsf_experiment_sent in zip(ori, tsf, tsf_experiment):
+                    if len(ori_sent) > 3:
+                        styler_output_fh.write(' '.join(w for w in ori_sent) + '\t|||\t')
+                        styler_output_fh.write(' '.join(w for w in tsf_sent) + '\t|||\t')
+                        styler_output_fh.write(' '.join(w for w in tsf_experiment_sent) + '\n')
         print('done')
 
 

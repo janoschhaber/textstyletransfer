@@ -19,11 +19,6 @@ def load_arguments():
     argparser.add_argument('--online_testing',
             type=bool,
             default=False)
-    argparser.add_argument('--experiment',
-            action='store_true')
-    argparser.add_argument('--experiment_data',
-                           type=str,
-                           default='')
     argparser.add_argument('--output',
             type=str,
             default='')
@@ -95,7 +90,21 @@ def load_arguments():
     argparser.add_argument('--n_filters',
             type=int,
             default=256)
-
+    # fab experiment
+    argparser.add_argument('--experiment',
+            action='store_true')
+    argparser.add_argument('--experiment_data',
+                           type=str,
+                           default='')
+    argparser.add_argument('--styler-save', dest='styler_save',
+                           type=str, help='name of file to save styler vectors to',
+                           default='')
+    argparser.add_argument('--styler-restore', dest='styler_restore',
+                           type=str, help='name of the file to restore styler vectors from',
+                           default='')
+    argparser.add_argument('--styler-results', dest='styler_results',
+                           type=str, help='name of the file to save results of the styler experiment',
+                           default='')
     args = argparser.parse_args()
 
     tf.logging.info('------------------------------------------------')

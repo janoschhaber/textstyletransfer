@@ -68,9 +68,13 @@ class Decoder(object):
 
     def rewrite(self, batch):
         """
-        Rewrites a batch to the generator initial hidden states for the original and transferred domains
-        :param batch: input batch
-        :return: initial hidden states for the original and transferred domains
+        Takes a batch of sentences (each encoded as a list of vocab ids), creates a latent representation for each in
+        both domains, and the decodes those latent representations, effectively reconstructing the sentences in original
+        and target domains
+        :param batch: input batch, a dictionary as returned by utils.get_batch
+        :return: ori, tsf. ori is a list of sentences (i.e. list of words as str) reconstructed in the original domain
+        from their latent representation. tsf has the same format as ori but the sentences are reconstructed from their
+        transferred latent representation
         """
         model = self.model
         h_ori, h_tsf= self.sess.run([model.h_ori, model.h_tsf],
@@ -87,3 +91,41 @@ class Decoder(object):
         tsf = strip_eos(tsf)
 
         return ori, tsf
+
+    def rewrite_experiment(self, batch, styler_vec):
+        """
+        Encondes and reconsturcts a given batch of sentences just like rewrite, but using the experiment styler_vec
+        technique, which consists on adding a styler vector to the latent representation of a sentence in its original
+        domain, and decoding to its original domain itself. Due to applying the styler vector to the latent encoding,
+        it is expected that decoded sentence is nevertheless, transferred, even though it was decoded using the original
+        encoding
+        :param batch: input batch, a dictionary as returned by utils.get_batch
+        :param styler_vec: a vector to add to the original encoded sentences to alter its decoding and bias it towards
+        the target domain
+        :return: ori, tsf. ori is a list of sentences (i.e. list of words as str) reconstructed in the original domain
+        from their latent representation. tsf has the same format as ori but the sentences are reconstructed from their
+        transferred latent representation
+        """
+        model = self.model
+        # h_ori is the encoder z state concatenated with the original y label latent representation
+        # h_tsf is exactly the same, but instead of generating the y latent representation with the labels, it
+        # generates it with 1 - labels, so h_tsf is z + other_y
+        h_ori, h_tsf= self.sess.run([model.h_ori, model.h_tsf],
+                                    feed_dict={model.dropout: 1,
+                                    model.batch_size: batch['size'],
+                                    model.enc_inputs: batch['enc_inputs'],
+                                    model.labels: batch['labels']})
+        h_tsf_experiment = h_ori + styler_vec
+        ori = self.decode(h_ori)
+        ori = [[self.vocab.id2word[i] for i in sent] for sent in ori]
+        ori = strip_eos(ori)
+
+        tsf_experiment = self.decode(h_tsf_experiment)
+        tsf_experiment = [[self.vocab.id2word[i] for i in sent] for sent in tsf_experiment]
+        tsf_experiment = strip_eos(tsf_experiment)
+
+        tsf = self.decode(h_tsf)
+        tsf = [[self.vocab.id2word[i] for i in sent] for sent in tsf]
+        tsf = strip_eos(tsf)
+
+        return ori, tsf, tsf_experiment
